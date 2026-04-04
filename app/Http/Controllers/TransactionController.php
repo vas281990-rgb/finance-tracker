@@ -4,14 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\StoreTransactionRequest;
 use App\Http\Requests\UpdateTransactionRequest;
+use App\Http\Resources\TransactionResource;
 use App\Models\Transaction;
 use Illuminate\Http\Request;
 
 class TransactionController extends Controller
 {
     /**
-     * Return a list of all transactions for the authenticated user.
-     * Supports optional filtering by type, date range, and category.
+     * Return a paginated list of transactions for the authenticated user.
      */
     public function index(Request $request)
     {
@@ -32,63 +32,46 @@ class TransactionController extends Controller
             $query->where('category', $request->category);
         }
 
-        return response()->json(
-            $query->orderBy('transaction_date', 'desc')->get()
-        );
+        $transactions = $query->orderBy('transaction_date', 'desc')->get();
+
+        // Wrap collection in TransactionResource for consistent formatting
+        return TransactionResource::collection($transactions);
     }
 
     /**
-     * Store a new transaction for the authenticated user.
+     * Store a new transaction.
      */
-    public function store(Request $request)
+    public function store(StoreTransactionRequest $request)
     {
-        $validated = $request->validate([
-            'type'             => 'required|in:income,expense',
-            'amount'           => 'required|numeric|min:0.01',
-            'description'      => 'required|string|max:255',
-            'category'         => 'nullable|string|max:100',
-            'transaction_date' => 'required|date',
-        ]);
+        $transaction = $request->user()->transactions()->create($request->validated());
 
-        // Attach transaction to the currently authenticated user
-        $transaction = $request->user()->transactions()->create($validated);
-
-        return response()->json($transaction, 201);
+        return new TransactionResource($transaction);
     }
 
     /**
-     * Return a single transaction (only if it belongs to the authenticated user).
+     * Return a single transaction.
      */
     public function show(Request $request, Transaction $transaction)
     {
-        // Ensure the transaction belongs to the current user
         if ($transaction->user_id !== $request->user()->id) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        return response()->json($transaction);
+        return new TransactionResource($transaction);
     }
 
     /**
-     * Update an existing transaction.
+     * Update a transaction.
      */
-    public function update(Request $request, Transaction $transaction)
+    public function update(UpdateTransactionRequest $request, Transaction $transaction)
     {
         if ($transaction->user_id !== $request->user()->id) {
             return response()->json(['message' => 'Forbidden'], 403);
         }
 
-        $validated = $request->validate([
-            'type'             => 'sometimes|in:income,expense',
-            'amount'           => 'sometimes|numeric|min:0.01',
-            'description'      => 'sometimes|string|max:255',
-            'category'         => 'nullable|string|max:100',
-            'transaction_date' => 'sometimes|date',
-        ]);
+        $transaction->update($request->validated());
 
-        $transaction->update($validated);
-
-        return response()->json($transaction);
+        return new TransactionResource($transaction);
     }
 
     /**
