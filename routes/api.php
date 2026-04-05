@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AnalyticsController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\TransactionController;
 use App\Http\Middleware\EnsureValidTransactionType;
@@ -16,4 +17,7 @@ Route::middleware('auth:sanctum')->group(function () {
     // Transaction routes with extra middleware to validate 'type' filter
     Route::middleware(EnsureValidTransactionType::class)
         ->apiResource('transactions', TransactionController::class);
+
+    // Analytics routes
+    Route::get('/analytics/summary', [AnalyticsController::class, 'summary']);
 });
